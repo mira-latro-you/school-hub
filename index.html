@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>School Hub</title>
+<meta name="description" content="Stundenplan, Aufgaben, Klassenarbeiten und Notizen an einem Ort.">
+
+<!-- App-Installation (Android/Chrome über manifest.json, iPhone über die apple-Tags) -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0E1526">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="School Hub">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="date" id="today"></div>
+    <div class="sync">
+      <button type="button" class="status-btn" id="statusBtn" aria-label="Systemstatus anzeigen"><span class="dot" id="statusDot"></span><span id="syncInfo"></span></button>
+      <button class="add-btn" id="addBtn" aria-label="Termin in Google Kalender eintragen">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Termin
+      </button>
+      <button class="icon-btn" id="refreshBtn" aria-label="Stundenplan jetzt aktualisieren" title="Jetzt aktualisieren">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 4v5h-5"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <nav class="nav" aria-label="Bereiche">
+    <button type="button" data-act="view" data-view="home" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11l8-6.5 8 6.5"/><path d="M6 9.5V19h12V9.5"/><path d="M10 19v-5h4v5"/></svg>Übersicht</button>
+    <button type="button" data-act="view" data-view="tasks"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M8.5 12.2l2.4 2.4 4.6-5"/></svg>Aufgaben<span class="count" id="taskCount" hidden></span></button>
+    <button type="button" data-act="view" data-view="notes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3.5h9l3.5 3.5v13.5H6z"/><path d="M14.5 3.5V7.5h4"/><path d="M9 12h6M9 15.5h6"/></svg>Notizen</button>
+    <button type="button" data-act="view" data-view="report"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 5.5A2.5 2.5 0 0 1 7.5 3H19v15H7.5A2.5 2.5 0 0 0 5 20.5z"/><path d="M5 20.5A2.5 2.5 0 0 1 7.5 18H19v3H7.5"/><path d="M9 7.5h6"/></svg>Bericht</button>
+    <button type="button" data-act="view" data-view="perf"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h16"/><path d="M7 16v-4M12 16V7M17 16v-6.5"/></svg>Leistung</button>
+  </nav>
+
+  <main id="app"><div class="skeleton"></div></main>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<dialog class="dlg" id="evDlg" aria-labelledby="evTitle">
+  <form class="dlg-inner" id="evForm" novalidate>
+    <h2 id="evTitle">Termin eintragen</h2>
+    <div class="file-row">
+      <button type="button" class="btn ghost scan-btn" id="fileBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6v18h12V7z"/><path d="M14 3v4h4"/><path d="M9 13h6M9 17h4"/></svg>Aus Datei erkennen</button>
+      <span class="scan-status">Arbeitsblatt als PDF oder Foto: Abgaben und Klausuren werden erkannt.</span>
+      <input type="file" id="fileInput" accept="application/pdf,image/*" hidden>
+    </div>
+    <label>Titel<input type="text" name="title" maxlength="200" placeholder="z. B. Lerngruppe LF04" autocomplete="off"></label>
+    <label class="row-check"><input type="checkbox" name="allDay" id="evAllDay">Ganztägig</label>
+    <label>Datum<input type="date" name="date"></label>
+    <div class="two" id="evTimes">
+      <label>Beginn<input type="time" name="start" value="16:00"></label>
+      <label>Ende<input type="time" name="end" value="17:00"></label>
+    </div>
+    <label>Ort<input type="text" name="location" maxlength="200" autocomplete="off"></label>
+    <label>Notiz<textarea name="notes" rows="2"></textarea></label>
+    <p class="form-error" id="evErr" role="alert"></p>
+    <div class="dlg-actions">
+      <button type="button" class="btn ghost" data-act="close-dlg">Abbrechen</button>
+      <button type="submit" class="btn primary" id="evSave">Eintragen</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog class="dlg" id="noteDlg" aria-labelledby="noteDlgTitle">
+  <form class="dlg-inner" id="noteForm" novalidate>
+    <h2 id="noteDlgTitle">Neue Notiz</h2>
+    <div class="two">
+      <label>Fach<select name="fach" id="noteFach"></select></label>
+      <label>Datum<input type="date" name="datum"></label>
+    </div>
+    <label>Titel<input type="text" name="titel" maxlength="200" placeholder="Optional" autocomplete="off"></label>
+    <label>Notiz<textarea name="text" rows="8" maxlength="20000" class="note-area"></textarea></label>
+    <div class="scan-row">
+      <button type="button" class="btn ghost scan-btn" id="scanBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Tafelbild scannen</button>
+      <span class="scan-status" id="scanStatus" role="status" aria-live="polite"></span>
+      <input type="file" id="scanInput" accept="image/*" hidden>
+    </div>
+    <label>Tags<input type="text" name="tags" placeholder="z. B. IHK, Klausur" autocomplete="off"></label>
+    <p class="form-error" id="noteErr" role="alert"></p>
+    <div class="dlg-actions">
+      <button type="button" class="btn danger" id="noteDel" hidden>Löschen</button>
+      <button type="button" class="btn ghost" data-act="close-dlg">Abbrechen</button>
+      <button type="submit" class="btn primary" id="noteSave">Speichern</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog class="dlg" id="foundDlg" aria-labelledby="foundTitle">
+  <div class="dlg-inner">
+    <h2 id="foundTitle">Gefundene Termine</h2>
+    <p class="scan-status" id="foundStatus" role="status" aria-live="polite"></p>
+    <div class="found" id="foundList"></div>
+    <div class="dlg-actions">
+      <button type="button" class="btn ghost" data-act="close-dlg">Abbrechen</button>
+      <button type="button" class="btn primary" id="foundSave" disabled>Ausgewählte eintragen</button>
+    </div>
+  </div>
+</dialog>
+
+<dialog class="dlg" id="gradeDlg" aria-labelledby="gradeTitle">
+  <form class="dlg-inner" id="gradeForm" novalidate>
+    <h2 id="gradeTitle">Neue Note</h2>
+    <div class="two">
+      <label>Fach<select name="fach" id="gradeFach"></select></label>
+      <label>Art<select name="art"><option>Schriftlich</option><option>Mündlich</option></select></label>
+    </div>
+    <label>Bezeichnung<input type="text" name="bez" maxlength="120" placeholder="z. B. Klassenarbeit Kaufvertrag" autocomplete="off"></label>
+    <div class="two">
+      <label>Note<input type="text" name="note" inputmode="decimal" placeholder="z. B. 2,3 oder 2-" autocomplete="off"></label>
+      <label>Gewicht<select name="gewicht"><option value="1">einfach</option><option value="0.5">halb (z. B. Kurztest)</option><option value="2">doppelt</option></select></label>
+    </div>
+    <label>Datum<input type="date" name="datum"></label>
+    <p class="form-error" id="gradeErr" role="alert"></p>
+    <div class="dlg-actions">
+      <button type="button" class="btn danger" id="gradeDel" hidden>Löschen</button>
+      <button type="button" class="btn ghost" data-act="close-dlg">Abbrechen</button>
+      <button type="submit" class="btn primary" id="gradeSave">Speichern</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog class="dlg" id="absDlg" aria-labelledby="absTitle">
+  <form class="dlg-inner" id="absForm" novalidate>
+    <h2 id="absTitle">Fehlzeit eintragen</h2>
+    <div class="two">
+      <label>Datum<input type="date" name="datum" id="absDate"></label>
+      <label>Verpasste Stunden<input type="number" name="stunden" min="1" max="12" step="1" id="absHours"></label>
+    </div>
+    <label>Grund<select name="grund"><option>Krankheit</option><option>Arzttermin</option><option>Betrieblich</option><option>Sonstiges</option></select></label>
+    <label class="row-check"><input type="checkbox" name="entschuldigt">Entschuldigung abgegeben</label>
+    <label>Notiz<input type="text" name="notiz" maxlength="300" autocomplete="off"></label>
+    <p class="form-error" id="absErr" role="alert"></p>
+    <div class="dlg-actions">
+      <button type="button" class="btn danger" id="absDel" hidden>Löschen</button>
+      <button type="button" class="btn ghost" data-act="close-dlg">Abbrechen</button>
+      <button type="submit" class="btn primary" id="absSave">Speichern</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog class="dlg" id="taskDlg" aria-labelledby="taskTitle">
+  <form class="dlg-inner" id="taskForm" novalidate>
+    <h2 id="taskTitle">Neue Aufgabe</h2>
+    <p class="info-when" id="taskSrc" hidden></p>
+    <label>Aufgabe<input type="text" name="titel" maxlength="200" placeholder="z. B. Übungszettel Kaufvertrag" autocomplete="off"></label>
+    <label>Fach<select name="fach" id="taskFach"></select></label>
+    <div class="two">
+      <label>Fällig am<input type="date" name="faellig"></label>
+      <label>Uhrzeit<input type="time" name="zeit"></label>
+    </div>
+    <label>Notiz<textarea name="notiz" rows="3" maxlength="1000"></textarea></label>
+    <p class="form-error" id="taskErr" role="alert"></p>
+    <div class="dlg-actions">
+      <button type="button" class="btn danger" id="taskDel" hidden>Löschen</button>
+      <button type="button" class="btn ghost" data-act="close-dlg">Abbrechen</button>
+      <button type="submit" class="btn primary" id="taskSave">Speichern</button>
+    </div>
+  </form>
+</dialog>
+
+<button type="button" class="fab" data-act="add" aria-label="Hinzufügen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+
+<dialog class="dlg sheet" id="addDlg" aria-labelledby="addTitle">
+  <div class="dlg-inner">
+    <h2 id="addTitle">Hinzufügen</h2>
+    <div class="sheet-list">
+      <button type="button" data-act="note-new" data-fach="Allgemein" data-datum=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15.5 4.5l4 4L9 19H5v-4z"/><path d="M13.5 6.5l4 4"/></svg><span>Notiz<small>Zur aktuellen oder nächsten Stunde</small></span></button>
+      <button type="button" data-act="scan" data-fach="Allgemein" data-datum=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg><span>Tafelbild scannen<small>Foto wird zu Text</small></span></button>
+      <button type="button" data-act="task-new"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M8.5 12.2l2.4 2.4 4.6-5"/></svg><span>Aufgabe<small>Mit Fälligkeit</small></span></button>
+      <button type="button" data-act="exam-new"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 21V4"/><path d="M6 4.5h11l-2 4 2 4H6"/></svg><span>Klassenarbeit<small>Mit Countdown</small></span></button>
+      <button type="button" data-act="ev-new"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2.5"/><path d="M4 10h16M8.5 3v4M15.5 3v4"/></svg><span>Termin<small>Im Google Kalender</small></span></button>
+      <button type="button" data-act="file-scan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6v18h12V7z"/><path d="M14 3v4h4"/><path d="M9 13h6M9 17h4"/></svg><span>Termine aus Datei<small>PDF oder Foto auslesen</small></span></button>
+    </div>
+    <div class="dlg-actions"><button type="button" class="btn ghost" data-act="close-dlg">Abbrechen</button></div>
+  </div>
+</dialog>
+
+<dialog class="dlg" id="infoDlg" aria-labelledby="infoTitle">
+  <div class="dlg-inner">
+    <div id="infoBody"></div>
+    <div class="dlg-actions">
+      <button type="button" class="btn danger" id="delBtn" hidden>Termin löschen</button>
+      <button type="button" class="btn primary" data-act="close-dlg">Schließen</button>
+    </div>
+  </div>
+</dialog>
+
+<!-- Reihenfolge ist wichtig: erst Einstellungen, dann Testdaten, dann Verbindung, dann App -->
+<script src="config.js"></script>
+<script src="mock-data.js"></script>
+<script src="api.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
