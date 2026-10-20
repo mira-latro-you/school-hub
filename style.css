@@ -685,3 +685,41 @@ body { padding-top: env(safe-area-inset-top); }
   width: 100%; padding: 12px; border: 0; border-radius: 12px; font: inherit; font-weight: 700; color: #fff;
   background: var(--grad, linear-gradient(135deg, #F39A55, #CF5F1C)); color: #1E1208; cursor: pointer;
 }
+
+/* ---------- Offline-Stand, Einstellungen, Stundenplan-Markierungen ---------- */
+body.is-stale #statusDot { animation: hub-pulse 1.2s ease-in-out infinite; }
+@keyframes hub-pulse { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { body.is-stale #statusDot { animation: none; } }
+
+.switch-row, .set-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 14px 0; border-top: 1px solid var(--line, rgba(255, 255, 255, .08));
+}
+.switch-row > span, .set-row > span { font-weight: 600; }
+.switch-row small, .set-row small { display: block; margin-top: 2px; color: var(--muted); font-weight: 500; font-size: 13px; line-height: 1.4; }
+.set-row .btn.danger { margin-right: 0; flex: none; }
+.switch-row input {
+  appearance: none; -webkit-appearance: none; flex: none; position: relative; cursor: pointer;
+  width: 50px; height: 30px; border-radius: 999px; margin: 0;
+  background: rgba(255, 255, 255, .14); border: 1px solid rgba(255, 255, 255, .14); transition: background .2s;
+}
+.switch-row input::after {
+  content: ""; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%;
+  background: #fff; box-shadow: 0 2px 6px rgba(0, 0, 0, .35); transition: transform .2s;
+}
+.switch-row input:checked { background: var(--grad, #E2792F); border-color: transparent; }
+.switch-row input:checked::after { transform: translateX(20px); }
+.switch-row input:focus-visible { outline: 2px solid #F5A56A; outline-offset: 2px; }
+
+/* Raumwechsel, Vertretung, Entfall: ganze Karte leicht eingefärbt, nicht nur der Balken */
+.lesson.cancel { background: linear-gradient(90deg, rgba(234, 107, 96, .13), transparent 70%); }
+.lesson.change { background: linear-gradient(90deg, rgba(226, 121, 47, .13), transparent 70%); }
+.lesson.exam   { background: linear-gradient(90deg, rgba(150, 130, 255, .13), transparent 70%); }
+
+/* Stand-Zeit unter dem Datum (auf schmalen Handys, wo neben dem Punkt kein Platz ist) */
+.top-left { min-width: 0; }
+.stand { display: none; margin-top: 2px; font-size: 12.5px; font-weight: 500; color: var(--muted); }
+@media (max-width: 479px) { .stand:not(:empty) { display: block; } }
+body.is-stale .stand { color: #F5A56A; }
+
+.dlg .switch-row { display: flex; flex-direction: row; align-items: center; }

@@ -116,9 +116,14 @@
   }
 
   /* Offline-Hülle und Installierbarkeit (nur auf eigener Seite, nicht in Apps Script). */
-  if (!inAppsScript && 'serviceWorker' in navigator && location.protocol !== 'file:') {
+  var isLocal = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
+  // Lokal (Live Server) ohne Service Worker, damit Änderungen sofort sichtbar sind
+  if (!inAppsScript && !isLocal && 'serviceWorker' in navigator && location.protocol !== 'file:') {
     window.addEventListener('load', function () {
       navigator.serviceWorker.register('sw.js').catch(function (e) { console.warn('Service Worker:', e); });
     });
+  }
+  if (isLocal && 'serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistrations().then(function (rs) { rs.forEach(function (r) { r.unregister(); }); });
   }
 })();

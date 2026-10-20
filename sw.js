@@ -4,7 +4,7 @@
  * und installierbar ist. Deine Daten werden NICHT zwischengespeichert.
  * Nach Änderungen an Dateien: VERSION hochzählen, sonst sehen Handys die alte Version.
  */
-var VERSION = 'hub-v2';
+var VERSION = 'hub-v3';
 var SHELL = ['./', 'index.html', 'style.css', 'app.js', 'api.js', 'config.js', 'mock-data.js', 'manifest.json',
   'icon-192.png', 'icon-512.png', 'apple-touch-icon.png'];
 
@@ -18,17 +18,19 @@ self.addEventListener('activate', function (e) {
   }).then(function () { return self.clients.claim(); }));
 });
 
-/* Nur eigene Dateien per GET: erst Netz, bei Offline aus dem Speicher. API-Aufrufe laufen unberührt durch. */
+/* App-Hülle: sofort aus dem Speicher (auch ohne Netz), im Hintergrund still aktualisieren.
+   Neue Versionen erscheinen dadurch beim übernächsten Öffnen. API-Aufrufe laufen unberührt durch. */
 self.addEventListener('fetch', function (e) {
   var req = e.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
-  e.respondWith(
-    fetch(req).then(function (res) {
-      var copy = res.clone();
-      caches.open(VERSION).then(function (c) { c.put(req, copy); });
-      return res;
-    }).catch(function () {
-      return caches.match(req, { ignoreSearch: true }).then(function (r) { return r || caches.match('index.html'); });
-    })
-  );
+  e.respondWith(caches.open(VERSION).then(function (cache) {
+    return cache.match(req, { ignoreSearch: true }).then(function (hit) {
+      var update = fetch(req).then(function (res) {
+        if (res && res.ok) cache.put(req, res.clone());
+        return res;
+      }).catch(function () { return hit || cache.match('index.html'); });
+      if (hit) { e.waitUntil(update.then(function () {}, function () {})); return hit; }
+      return update;
+    });
+  }));
 });

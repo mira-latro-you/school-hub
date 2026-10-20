@@ -24,7 +24,7 @@
 <body>
 <div class="wrap">
   <header class="top">
-    <div class="date" id="today"></div>
+    <div class="top-left"><div class="date" id="today"></div><div class="stand" id="standLine" aria-live="polite"></div></div>
     <div class="sync">
       <button type="button" class="status-btn" id="statusBtn" aria-label="Systemstatus anzeigen"><span class="dot" id="statusDot"></span><span id="syncInfo"></span></button>
       <button class="add-btn" id="addBtn" aria-label="Termin in Google Kalender eintragen">
@@ -32,6 +32,9 @@
       </button>
       <button class="icon-btn" id="refreshBtn" aria-label="Stundenplan jetzt aktualisieren" title="Jetzt aktualisieren">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 4v5h-5"/></svg>
+      </button>
+      <button class="icon-btn" id="settingsBtn" aria-label="Einstellungen" title="Einstellungen">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
       </button>
     </div>
   </header>
@@ -184,6 +187,24 @@
       <button type="button" data-act="file-scan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6v18h12V7z"/><path d="M14 3v4h4"/><path d="M9 13h6M9 17h4"/></svg><span>Termine aus Datei<small>PDF oder Foto auslesen</small></span></button>
     </div>
     <div class="dlg-actions"><button type="button" class="btn ghost" data-act="close-dlg">Abbrechen</button></div>
+  </div>
+</dialog>
+
+<dialog class="dlg sheet" id="setDlg" aria-labelledby="setTitle">
+  <div class="dlg-inner">
+    <h2 id="setTitle">Einstellungen</h2>
+    <label class="switch-row">
+      <span>Private Termine ausblenden<small>Zeigt im Stundenplan nur noch Termine, die über den School Hub eingetragen wurden.</small></span>
+      <input type="checkbox" id="setHidePrivate" role="switch">
+    </label>
+    <div class="set-row">
+      <span>Offline-Modus<small id="setSaved"></small></span>
+    </div>
+    <div class="set-row">
+      <span>Gespeicherte Daten löschen<small>Entfernt den Offline-Stand und deinen Schlüssel von diesem Gerät, z. B. vor dem Verleihen.</small></span>
+      <button type="button" class="btn danger" id="setClear">Löschen</button>
+    </div>
+    <div class="dlg-actions"><button type="button" class="btn primary" data-act="close-dlg">Fertig</button></div>
   </div>
 </dialog>
 

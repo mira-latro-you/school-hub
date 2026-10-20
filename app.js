@@ -7,6 +7,55 @@ var WANT = {};
 var WD = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
 var MO = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
 
+/* ---------- Einstellungen & Offline-Speicher (nur auf diesem Gerät) ---------- */
+
+var SETTINGS = (function () {
+  try { return JSON.parse(localStorage.getItem('hub:settings') || '{}'); } catch (e) { return {}; }
+})();
+function saveSettings() {
+  try { localStorage.setItem('hub:settings', JSON.stringify(SETTINGS)); } catch (e) { /* privater Modus */ }
+}
+
+/* Gespeicherter letzter Stand: App zeigt ihn sofort, lädt im Hintergrund neu (stale-while-revalidate). */
+var CACHE_KEY = (function () {
+  if (window.HUB_MODE === 'mock') return '';
+  var k = '';
+  try { k = new URLSearchParams(location.search).get('k') || localStorage.getItem('hubKey') || ''; } catch (e) { /* egal */ }
+  var h = 0;
+  for (var i = 0; i < k.length; i++) h = (h * 31 + k.charCodeAt(i)) | 0;
+  return 'hub:cache:v1:' + (h >>> 0).toString(36);
+})();
+var FRESH = false;      // true, sobald Daten dieser Sitzung vom Server kamen
+var SAVED_AT = '';      // Zeitpunkt des gespeicherten Stands (HH:MM)
+
+function readCache() {
+  if (!CACHE_KEY) return null;
+  try {
+    var c = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
+    if (!c || !c.data) return null;
+    SAVED_AT = c.at || '';
+    return c.data;
+  } catch (e) { return null; }
+}
+function writeCache(data) {
+  if (!CACHE_KEY || !data || !FRESH) return;
+  var d = new Date(), at = pad(d.getHours()) + ':' + pad(d.getMinutes());
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ at: at, data: data }));
+  } catch (e) {
+    // Speicher voll (z. B. viele Tafelbilder): ohne Bilder speichern
+    try {
+      var slim = Object.assign({}, data, { notes: (data.notes || []).map(function (n) { return Object.assign({}, n, { bild: '' }); }) });
+      localStorage.setItem(CACHE_KEY, JSON.stringify({ at: at, data: slim }));
+    } catch (e2) { /* dann eben ohne Offline-Stand */ }
+  }
+}
+function clearCache() {
+  try {
+    Object.keys(localStorage).forEach(function (k) { if (k.indexOf('hub:cache:') === 0) localStorage.removeItem(k); });
+  } catch (e) { /* egal */ }
+}
+
 function $(id) { return document.getElementById(id); }
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
 function pad(n) { return (n < 10 ? '0' : '') + n; }
@@ -119,6 +168,7 @@ function renderSign(blocks) {
 function eventsByDay(events) {
   var map = {};
   (events || []).forEach(function (ev, idx) {
+    if (SETTINGS.hidePrivate && !ev.fromApp) return;   // Einstellung: private Termine ausblenden
     var d = at(ev.datum, '12:00'), end = at(ev.endDatum || ev.datum, '12:00'), guard = 0;
     while (d <= end && guard++ < 31) {
       var k = isoDay(d);
@@ -1191,7 +1241,11 @@ function render(data) {
     var on = b.getAttribute('data-view') === (VIEW === 'subject' ? 'notes' : VIEW);
     if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
   });
-  $('syncInfo').textContent = data.lastSync ? 'Stand ' + data.lastSync.slice(11) + ' Uhr' : '';
+  var stand = data.lastSync ? 'Stand ' + data.lastSync.slice(11) + ' Uhr' : '';
+  $('syncInfo').textContent = FRESH ? stand : (stand ? stand + ' · lädt…' : 'Lädt…');
+  $('standLine').textContent = $('syncInfo').textContent;
+  document.body.classList.toggle('is-stale', !FRESH);
+  writeCache(data);
   updateTaskCount();
   updateStatusBtn();
 }
@@ -1222,7 +1276,17 @@ function showError(err) {
 }
 
 function load() {
-  RUN().withSuccessHandler(apply).withFailureHandler(showError).getDashboard();
+  RUN()
+    .withSuccessHandler(function (d) { FRESH = true; apply(d); if (document.querySelector('dialog[open]')) writeCache(d); })
+    .withFailureHandler(function (err) {
+      if (DATA && !FRESH) {
+        $('refreshBtn').classList.remove('spin');
+        $('syncInfo').textContent = SAVED_AT ? 'Offline · Stand ' + SAVED_AT + ' Uhr' : 'Offline';
+        $('standLine').textContent = $('syncInfo').textContent;
+        toast('Keine Verbindung. Du siehst den zuletzt gespeicherten Stand.');
+      } else showError(err);
+    })
+    .getDashboard();
 }
 
 function markGroups(groups) {
@@ -1347,12 +1411,35 @@ $('refreshBtn').addEventListener('click', function () {
   if (btn.classList.contains('spin')) return;
   btn.classList.add('spin');
   RUN()
-    .withSuccessHandler(function (d) { btn.classList.remove('spin'); apply(d); toast(d.syncError ? 'Untis-Abgleich fehlgeschlagen. Details unter Systemstatus.' : 'Stundenplan aktualisiert'); })
+    .withSuccessHandler(function (d) { btn.classList.remove('spin'); FRESH = true; apply(d); toast(d.syncError ? 'Untis-Abgleich fehlgeschlagen. Details unter Systemstatus.' : 'Stundenplan aktualisiert'); })
     .withFailureHandler(showError)
     .syncNow();
 });
 
+/* ---------- Einstellungen ---------- */
+function openSettings() {
+  $('setHidePrivate').checked = !!SETTINGS.hidePrivate;
+  $('setSaved').textContent = SAVED_AT || FRESH ? 'Offline-Stand gespeichert' + (SAVED_AT ? ' (zuletzt ' + SAVED_AT + ' Uhr)' : '') : 'Noch kein Offline-Stand gespeichert';
+  $('setDlg').showModal();
+}
+$('settingsBtn').addEventListener('click', openSettings);
+$('setHidePrivate').addEventListener('change', function () {
+  SETTINGS.hidePrivate = this.checked; saveSettings();
+  if (DATA) render(DATA);
+  toast(this.checked ? 'Private Termine ausgeblendet' : 'Private Termine werden angezeigt');
+});
+$('setClear').addEventListener('click', function () {
+  clearCache();
+  try { localStorage.removeItem('hubKey'); } catch (e) { /* egal */ }
+  $('setDlg').close();
+  toast('Gespeicherte Daten und Schlüssel auf diesem Gerät gelöscht');
+});
+
 header();
+(function () {
+  var cached = readCache();
+  if (cached) render(cached);   // sofort anzeigen, ohne Ladebalken
+})();
 load();
 setInterval(function () { header(); if (DATA && VIEW === 'home' && !document.querySelector('dialog[open]')) render(DATA); }, 30000);     // Countdown aktuell halten
 setInterval(load, 5 * 60000);                                              // neue Daten alle 5 Minuten
